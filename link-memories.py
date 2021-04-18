@@ -1,12 +1,29 @@
+import hashlib
 import itertools
 import os
 
 MEMORY_DIR = 'memory'
-THREAD_DIR = 'threads'
-MULTI_THREAD_DIR = '.threads'
+THREAD_DIR = 'symlinks'
+MULTI_THREAD_DIR = '.symlinks'
+VERBOSE = True
 
 def remove_hash_from_tags(input):
     return input.replace('#', '')
+
+def extract_concepts_from_title(title):
+    '''
+    Extract the concepts from the title
+    :param title: String title of page
+    :return: all concepts as an list of strings
+    '''
+    concepts = []
+    for word in title.split():
+        if word.startswith('*') and word.endswith('*'):
+            concept = word.replace('*', '')
+            concepts.append(concept)
+            if VERBOSE:
+                print("  {}".format(concept))
+    return concepts
 
 def create_directory(dir):
     '''
@@ -29,13 +46,22 @@ def create_symlink(symlink, target):
         print("  {} -> {}".format(symlink, target))
         os.symlink(target, symlink)
 
+def create_hash_from_tags(tags):
+    '''
+    Create a sha-256 hash of concatenated tags, so that the same tags always hash to the same value
+    :param tags: list of tags to hash
+    :return: string hasj
+    '''
+    key = ''.join(tags).encode("utf-8")
+    return hashlib.sha256(key).hexdigest()
+
 
 def recurse_thread_combinations(memory_file, memory_title, threads, depth, dest_dir):
     '''
     Creates all combininations of paths to file.
     - ./threads contains top level (single) threads
-    - ./.thread (hidden) contains combinations of threads, each a folder like tag1-tag2-tag3
-    - inside folders are simlinks to nested threads. So inside tag1-tag2 is a symlink called tag3 pointing to tag1-tag2-tag3
+    - ./.thread (hidden) contains combinations of threads, each a folder using a guid name
+    - inside folders are simlinks to nested threads. So inside tag1-tag2 is a symlink called tag3 pointing to combined guid name
     :param memory_file:
     :param memory_title:
     :param threads:
@@ -55,7 +81,7 @@ def recurse_thread_combinations(memory_file, memory_title, threads, depth, dest_
         base_path = os.path.join(dest_dir, THREAD_DIR)
         relative_path = '../../' + MULTI_THREAD_DIR
         memory_relative_path = '../../' + MEMORY_DIR
-    target_relative_path = os.path.join(relative_path, '-'.join(threads))
+    target_relative_path = os.path.join(relative_path, create_hash_from_tags(threads))
 
     # Create a threads_set for easy set diffing
     threads_set = set(threads)
@@ -65,7 +91,10 @@ def recurse_thread_combinations(memory_file, memory_title, threads, depth, dest_
     combinations = itertools.combinations(threads, depth)
     for combination in combinations:
         # Create directory that joins multiple threads. Ex: ./.threads/tag1-tag2-tag3
-        path = os.path.join(base_path, '-'.join(combination))
+        if depth > 1: # Create a hash of the tags, use that as the directory name
+            path = os.path.join(base_path, create_hash_from_tags(combination))
+        else: # use the top level tags
+            path = os.path.join(base_path, combination[0])
         create_directory(path)
 
         # Create a symlink to the file
@@ -76,15 +105,13 @@ def recurse_thread_combinations(memory_file, memory_title, threads, depth, dest_
         # Create a symlink for a path to a deeper nested thread
         diff = list(threads_set - set(combination))
         if diff:
-            print("{}{}: {} -> {}".format(spaces, path, diff[0], target_relative_path))
+            #print("{}{}: {} -> {}".format(spaces, path, diff[0], target_relative_path))
             symlink_path = os.path.join(path, diff[0])
             create_symlink(symlink_path, target_relative_path)
-        else:
-            print("{}".format(path))
+        #else:
+            #print("{}".format(path))
         if depth > 1:
             recurse_thread_combinations(memory_file, memory_title, combination, depth-1, dest_dir)
-
-
 
 def create_threads_for_repo(repo_dir, dest_dir):
     # Set directories to use, creating if needed
@@ -101,29 +128,15 @@ def create_threads_for_repo(repo_dir, dest_dir):
             continue
 
         memory_file = os.path.join(memory_dir, filename)
-        print("Processing {}".format(memory_file))
+        #print("Processing {}".format(memory_file))
         with open(memory_file) as f:
-            # Read first two lines to extract title and thread names
-            memory_title = f.readline().rstrip().replace('# ', '')
-            #print(title)
-            threads = []
-            thread_line = f.readline().rstrip()
-            if thread_line.startswith("#"):
-                # Make sure we have tags on second line.
-                thread_lines = thread_line.split(' ')
-                threads = list(map(remove_hash_from_tags, thread_lines))
-                threads.sort()
-            recurse_thread_combinations(filename, memory_title, threads, len(threads), dest_dir)
-
-            # skip
-            continue
-            for thread in threads:
-                print(" {}".format(thread))
-                # Make main thread
-                main_thread_directory = os.path.join(main_directory, thread)
-
-                # Symlink file
-                main_thread_file = os.path.join(main_thread_directory, title + ".md")
+            # Read first line to extract title and tags
+            title_line = f.readline().rstrip().lstrip('#').lstrip()
+            if VERBOSE:
+                print(title_line)
+            concepts = extract_concepts_from_title(title_line)
+            title_line = title_line.replace('*', '')
+            recurse_thread_combinations(filename, title_line, concepts, len(concepts), dest_dir)
 
 print(os.getcwd())
 create_threads_for_repo('.', '.')
