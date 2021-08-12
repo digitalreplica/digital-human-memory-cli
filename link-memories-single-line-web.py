@@ -137,7 +137,7 @@ class MemoryThreads:
                 self.forward_links[memory_page.title] = memory_page
             else:
                 print("Duplicate title '{}' in files {} and {}".format(memory_page.title, filename,
-                                                                       forward_links[memory_page.title]), file=sys.stderr)
+                                                                       self.forward_links[memory_page.title]), file=sys.stderr)
 
             # Add reverse links to page using id
             self.reverse_links[memory_page.id] = memory_page
