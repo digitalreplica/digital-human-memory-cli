@@ -1,8 +1,9 @@
+#!/usr/bin/env python3
 import hashlib
 import itertools
 import os
 
-MEMORY_DIR = 'memory'
+MEMORY_DIR = '.'
 THREAD_DIR = 'symlinks'
 MULTI_THREAD_DIR = '.symlinks'
 VERBOSE = True
@@ -125,6 +126,9 @@ def create_threads_for_repo(repo_dir, dest_dir):
     for filename in os.listdir(memory_dir):
         # Only markdown files
         if not filename.endswith(".md"):
+            continue
+        # where the length of the filename is 39 chars (guid.md)
+        if not len(filename) == 39:
             continue
 
         memory_file = os.path.join(memory_dir, filename)
