@@ -147,6 +147,7 @@ class MemoryThreads:
 
             # Create memory threads from concepts
             self.recurse_concepts(memory_page, memory_page.concepts, len(memory_page.concepts))
+            pass
 
     def recurse_concepts(self, memory_page, concepts, depth, child_memory_thread=None):
         '''
