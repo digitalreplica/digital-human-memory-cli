@@ -60,6 +60,18 @@ def search_files(directory='.', extension=''):
             filelist.append((os.path.join(dirpath, name)))
     return filelist
 
+def cleanup_old_files(filelist):
+    filelist.sort(key=lambda i: len(i), reverse=True)
+    for filename in filelist:
+        # Remove symlinks and files
+        if os.path.islink(filename) or os.path.isfile(filename):
+            os.remove(filename)
+        # Remove directories if empty
+        elif os.path.isdir(filename):
+            if len(os.listdir(filename)) == 0:  # Check if the folder is empty
+                shutil.rmtree(filename)  # If so, delete it
+
+
 ##### MemoryPage #####
 class MemoryPage:
     '''
@@ -264,8 +276,14 @@ class MemoryThreads:
         web_directory = os.path.join(self.memory_dir, WEB_DIRECTORY)
         create_directory(web_directory)
 
+        # Save list of current files so we can clean up old files later (as dictionary with filenames as keys)
+        old_files = search_files(web_directory)
+
         # Write README.md in web_directory
         readme_path = os.path.join(web_directory, "README.md")
+        # Remove from old_list
+        with suppress(ValueError):
+            old_files.remove(readme_path)
         with open(readme_path, 'w') as readme_file:
             readme_file.write("# Memory single concepts\n")
             readme_file.write("\n")
@@ -276,6 +294,10 @@ class MemoryThreads:
                 if memory_concept.is_single:
                     concept_relative_path = os.path.relpath(concept_path, start=os.path.dirname(readme_path))
                     readme_file.write(f"* [{memory_concept.id}](./{concept_relative_path})\n")
+
+                # Remove from old_list
+                with suppress(ValueError):
+                    old_files.remove(concept_path)
 
                 # Write concept markdown file
                 with open(concept_path, 'w') as markdown_file:
@@ -297,8 +319,9 @@ class MemoryThreads:
                             page_relative_path = os.path.relpath(page.filepath, start=os.path.dirname(concept_path))
                             markdown_file.write("* [{}]({})\n".format(page.title, page_relative_path))
 
-        # Write Readme
-        readme_path = os.path.join(web_directory, "README.md")
+        # Clean up old files, sorting list by length decending to delete files before folders
+        cleanup_old_files(old_files)
+        pass
 
     def get_concept_web_path(self, web_directory: str, memory_concept: MemoryConcept):
         concept_name = memory_concept.id
@@ -361,13 +384,7 @@ class MemoryThreads:
                         old_files.remove(concept_symlink_path)
 
         # Clean up old files, sorting list by length decending to delete files before folders
-        old_files.sort(key=lambda i: len(i), reverse=True)
-        for filename in old_files:
-            if os.path.islink(filename):
-                os.remove(filename)
-            elif os.path.isdir(filename):
-                if len(os.listdir(filename)) == 0:  # Check if the folder is empty
-                    shutil.rmtree(filename)  # If so, delete it
+        cleanup_old_files(old_files)
         pass
 
     def link_memories(self):
@@ -439,7 +456,7 @@ def app_web(
     verbose: bool = typer.Option(True, help="Verbose output")
 ):
     """
-    Create web concept threads for memories
+    Create web of concepts using markdown files, rendered as html when browsing the repo online.
     """
     VERBOSE = verbose
     threads = MemoryThreads()
@@ -451,7 +468,7 @@ def app_symlink(
     verbose: bool = typer.Option(True, help="Verbose output")
 ):
     """
-    Create symlink concept web
+    Create web of concepts using symlinks for easy local editiing
     """
     VERBOSE = verbose
     threads = MemoryThreads()
