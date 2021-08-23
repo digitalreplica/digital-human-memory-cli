@@ -5,6 +5,7 @@ import os
 import subprocess
 import typer
 import uuid
+from contextlib import suppress
 
 ##### Globals #####
 WEB_DIRECTORY = "web"
@@ -38,6 +39,26 @@ def create_directory(dir):
         if VERBOSE:
             print("Making {}".format(dir))
         os.mkdir(dir)
+
+def create_symlink(symlink, target):
+    '''
+    Creates a symlink, if it doesn't exist
+    :param symlink:
+    :param target:
+    :return:
+    '''
+    if not os.path.islink(symlink):
+        print("  {} -> {}".format(symlink, target))
+        os.symlink(target, symlink)
+
+def search_files(directory='.', extension=''):
+    filelist = []
+    for dirpath, dirnames, files in os.walk(directory):
+        for name in dirnames:
+            filelist.append((os.path.join(dirpath, name)))
+        for name in files:
+            filelist.append((os.path.join(dirpath, name)))
+    return filelist
 
 ##### MemoryPage #####
 class MemoryPage:
@@ -285,6 +306,70 @@ class MemoryThreads:
             concept_name = memory_concept.id.decode('utf-8')
         return os.path.join(web_directory, f"{concept_name}.md")
 
+    def create_symlinks(self):
+        """
+        Create web of concepts using symlinks for easy local editing
+        :return:
+        """
+        if VERBOSE:
+            print("")
+            print("Creating concept symlinks")
+
+        # Setup symlink directory
+        symlink_directory = os.path.join(self.memory_dir, SYMLINK_DIRECTORY)
+        create_directory(symlink_directory)
+
+        # Save list of current files so we can clean up old files later (as dictionary with filenames as keys)
+        old_files = search_files(symlink_directory)
+
+        # Sort concepts by how may concepts they have
+        concept_values = list(self.concepts.values())
+        concept_values.sort(key = lambda i: len(i.concepts))
+
+        # Loop over concepts
+        for memory_concept in concept_values:
+            # Create directory for concept
+            concept_directory = os.path.join(symlink_directory, memory_concept.id)
+            create_directory(concept_directory) # create if not exists
+
+            # Remove from old_list
+            with suppress(ValueError):
+                old_files.remove(concept_directory)
+
+            # Create directories for subconcepts and link
+            if memory_concept.subconcepts:
+                for subconcept in memory_concept.subconcepts:
+                    diff = subconcept.diff_concepts(memory_concept)
+                    subconcept_path = os.path.join(symlink_directory, subconcept.id) #
+                    subconcept_relative_path = f"../{subconcept.id}"
+                    subconcept_symlink_name = os.path.join(concept_directory, diff[0]) # Uses the diff as the symlink name to the folder
+                    create_directory(subconcept_path)  # create if not exists
+                    create_symlink(subconcept_symlink_name, subconcept_relative_path)
+                    pass
+
+            # Create symlinks for pages
+            if memory_concept.pages:
+                for page in memory_concept.pages:
+                    # Create file symlink using relative paths
+                    title = page.title.replace('*', '')
+                    concept_symlink_path = os.path.join(concept_directory, f"{title}.md")
+                    concept_relative_path = os.path.relpath(page.filepath, start=concept_directory)
+                    create_symlink(concept_symlink_path, concept_relative_path)
+
+                    # Remove from old_list
+                    with suppress(ValueError):
+                        old_files.remove(concept_symlink_path)
+
+        # Clean up old files, sorting list by length decending to delete files before folders
+        old_files.sort(key=lambda i: len(i), reverse=True)
+        for filename in old_files:
+            if os.path.islink(filename):
+                os.remove(filename)
+            elif os.path.isdir(filename):
+                if len(os.listdir(filename)) == 0:  # Check if the folder is empty
+                    shutil.rmtree(filename)  # If so, delete it
+        pass
+
     def link_memories(self):
         '''
         Look through memory files for links to other memory files. Update links if needed.
@@ -359,6 +444,18 @@ def app_web(
     VERBOSE = verbose
     threads = MemoryThreads()
     threads.write_web_markdown_files()
+    pass
+
+@app.command("symlink")
+def app_symlink(
+    verbose: bool = typer.Option(True, help="Verbose output")
+):
+    """
+    Create symlink concept web
+    """
+    VERBOSE = verbose
+    threads = MemoryThreads()
+    threads.create_symlinks()
     pass
 
 ##### Main #####
