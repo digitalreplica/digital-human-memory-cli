@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import datetime
 import hashlib
 import itertools
 import os
@@ -483,6 +484,17 @@ def app_symlink(
     threads = MemoryThreads()
     threads.create_symlinks()
     pass
+
+@app.command("timestamp")
+def app_timestamp():
+    """
+    Copy a date and time stamp to the clipborad
+    """
+    timestamp = datetime.datetime.now().replace(microsecond=0).isoformat()
+    copy_to_clipboard(timestamp)
+    if VERBOSE:
+        pretty_timestamp = typer.style(timestamp, fg=typer.colors.GREEN, bold=True)
+        typer.echo(f"{timestamp} copied to clipboard")
 
 ##### Main #####
 if __name__ == "__main__":
