@@ -1,3 +1,18 @@
-# Memory Threads via Symlinks
+# HumanDigitalMemory CLI
 
-This tool is part of the Shared Digital Memory project. It uses symlinks on a local copy of a memory repo to create a multi-tag thread structure.
+This provides a command line interface for common HumanDigitalMemory functions.
+
+hdm
+- get help and basic usage
+
+hdm symlink
+- creates a web of symlinks to reach memories
+
+hdm web
+- creates a web of markdown files, to be rendered by web browsers from the repo
+
+hdm guid
+- copies a random guid into the clipboard
+
+hdm memory
+- creates a memory file in the current directory
