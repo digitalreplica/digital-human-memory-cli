@@ -2,6 +2,7 @@
 import hashlib
 import itertools
 import os
+import shutil
 import subprocess
 import typer
 import uuid
@@ -48,7 +49,8 @@ def create_symlink(symlink, target):
     :return:
     '''
     if not os.path.islink(symlink):
-        print("  {} -> {}".format(symlink, target))
+        if VERBOSE:
+            print("  {} -> {}".format(symlink, target))
         os.symlink(target, symlink)
 
 def search_files(directory='.', extension=''):
@@ -61,14 +63,21 @@ def search_files(directory='.', extension=''):
     return filelist
 
 def cleanup_old_files(filelist):
+    if VERBOSE:
+        print("")
+        print("Cleaning up outdated files")
     filelist.sort(key=lambda i: len(i), reverse=True)
     for filename in filelist:
         # Remove symlinks and files
         if os.path.islink(filename) or os.path.isfile(filename):
+            if VERBOSE:
+                print(f"  Removing {filename}")
             os.remove(filename)
         # Remove directories if empty
         elif os.path.isdir(filename):
             if len(os.listdir(filename)) == 0:  # Check if the folder is empty
+                if VERBOSE:
+                    print(f"  Removing empty folder {filename}")
                 shutil.rmtree(filename)  # If so, delete it
 
 
@@ -176,7 +185,7 @@ class MemoryThreads:
         # All pages and concepts are loaded, but not linked together. Recurse through concepts and link together
         if VERBOSE:
             print("")
-            print("Recursively linking concepts")
+            print("Linking concepts")
         memory_concepts = self.concepts.values()
         for memory_concept in memory_concepts:
             self.recurse_concepts(memory_concept)
@@ -220,9 +229,6 @@ class MemoryThreads:
         '''
         # When first starting, set depth to the number of concepts minus 1
         depth = len(main_memory_concept.concepts) - 1
-            #child_memory_concept = main_memory_concept
-        #memory_thread = self.get_thread(concepts)
-        #memory_thread.add_page(memory_page)
         if depth > 0:
             combinations = itertools.combinations(main_memory_concept.concepts, depth)
             for combination in combinations:
@@ -368,6 +374,9 @@ class MemoryThreads:
                     subconcept_symlink_name = os.path.join(concept_directory, diff[0]) # Uses the diff as the symlink name to the folder
                     create_directory(subconcept_path)  # create if not exists
                     create_symlink(subconcept_symlink_name, subconcept_relative_path)
+                    # Remove from old_list
+                    with suppress(ValueError):
+                        old_files.remove(subconcept_path)
                     pass
 
             # Create symlinks for pages
