@@ -1,5 +1,7 @@
 # HumanDigitalMemory CLI
 
+NOTE: This work has evolved into https://github.com/digitalreplica/conceptual-knowledge
+
 This provides a command line interface for common HumanDigitalMemory functions.
 
 hdm
